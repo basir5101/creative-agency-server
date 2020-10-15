@@ -3,12 +3,15 @@ const express = require('express')
 const app = express()
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const fs = require('fs-extra')
+const fileUpload = require('express-fileupload');
 const MongoClient = require('mongodb').MongoClient;
 
 
 app.use(bodyParser.json())
 app.use(cors());
-
+app.use(express.static('review'));
+app.use(fileUpload())
 
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jo990.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
@@ -57,13 +60,47 @@ app.get('/admins', (req, res) =>{
  })
 
  //adding reviews into database
- app.post('/addReview', (req, res) =>{
-  const review = req.body
-  reviewCollection.insertOne(review)
-  .then(result =>{ 
-    res.send(result.insertedCount > 0)
+//  app.post('/addReview', (req, res) =>{
+//   const review = req.body
+//   reviewCollection.insertOne(review)
+//   .then(result =>{ 
+//     res.send(result.insertedCount > 0)
+//   })
+// })
+
+// adding reviews into database
+app.post('/addReview', (req, res) =>{
+  const file = req.files.file;
+  const name = req.body.name;
+  const Designation = req.body.Designation
+  const description = req.body.description;
+  const filePath = `${__dirname}/review/${file.name}`;
+
+  file.mv(filePath, err =>{
+    if(err){
+      console.log(err);
+      return res.status(500).send({msg: 'fail to load image'})
+    }
+    const newImg = fs.readFileSync(filePath);
+    const encImg = newImg.toString('base64');
+
+    var image = {
+      contentType: req.files.file.mimetype,
+      size: req.files.size,
+      img: Buffer(encImg, 'base64')
+    }
+
+    reviewCollection.insertOne({name, description, Designation, image})
+      .then(result =>{ 
+        fs.remove(filePath, error =>{
+          if(error){console.log(error)}
+          res.send(result.insertedCount > 0)
+        })
+      })
   })
 })
+
+
 
 //get all reviews 
 app.get('/reviews', (req, res) =>{
