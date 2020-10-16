@@ -44,12 +44,36 @@ app.get('/admins', (req, res) =>{
 
 // adding service into database
   app.post('/addService', (req, res) =>{
-    const service = req.body
-    serviceCollection.insertOne(service)
-    .then(result =>{ 
-      res.send(result.insertedCount > 0)
-    })
+    const file = req.files.file;
+      const title = req.body.title;
+      const description = req.body.description;
+      const filePath = `${__dirname}/service/${file.name}`;
+      
+      file.mv(filePath, err =>{
+            if(err){
+              console.log(err);
+              return res.status(500).send({msg: 'fail to load image'})
+            }
+            const newImg = fs.readFileSync(filePath);
+            const encImg = newImg.toString('base64');
+        
+            var photo = {
+              contentType: req.files.file.mimetype,
+              size: req.files.size,
+              img: Buffer(encImg, 'base64')
+            }
+        
+            serviceCollection.insertOne({title, description, photo})
+              .then(result =>{ 
+                fs.remove(filePath, error =>{
+                  if(error){console.log(error)}
+                  res.send(result.insertedCount > 0)
+                })
+              })
+          })
 })
+
+
 
 // get all services
  app.get('/services', (req, res) =>{
@@ -59,16 +83,10 @@ app.get('/admins', (req, res) =>{
    })
  })
 
- //adding reviews into database
-//  app.post('/addReview', (req, res) =>{
-//   const review = req.body
-//   reviewCollection.insertOne(review)
-//   .then(result =>{ 
-//     res.send(result.insertedCount > 0)
-//   })
-// })
+
 
 // adding reviews into database
+
 app.post('/addReview', (req, res) =>{
   const file = req.files.file;
   const name = req.body.name;
