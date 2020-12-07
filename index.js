@@ -13,152 +13,137 @@ app.use(cors());
 app.use(express.static('review'));
 app.use(fileUpload())
 
-
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.jo990.mongodb.net/${process.env.DB_NAME}?retryWrites=true&w=majority`;
+const uri =  "mongodb://shishatola:Munny101@cluster0-shard-00-00.jo990.mongodb.net:27017,cluster0-shard-00-01.jo990.mongodb.net:27017,cluster0-shard-00-02.jo990.mongodb.net:27017/agency?ssl=true&replicaSet=atlas-ifk28h-shard-0&authSource=admin&retryWrites=true&w=majority"
+//const uri = `mongodb+srv://shishatola:Munny101@cluster0.jo990.mongodb.net/agency?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
 client.connect(err => {
-  const userCollection = client.db("agency").collection("order");
-  const reviewCollection = client.db("agency").collection("reviews");
-  const serviceCollection = client.db("agency").collection("service");
-  const adminCollection = client.db("agency").collection("admin");
-  console.log('db-connected')
+  const serviceCollection = client.db(`agency`).collection(`service`);
+  const feedbackCollection = client.db(`agency`).collection(`reviews`);
+  const messageCollection = client.db(`agency`).collection(`message`);
+  const customerOrdersCollection = client.db(`agency`).collection(`order`);
+  const adminCollection = client.db(`agency`).collection(`admin`);
 
-
-
-//adding admin into database
-app.post('/addAdmin', (req, res) =>{
-  const admin = req.body
-  adminCollection.insertOne(admin)
-  .then(result =>{ 
-    res.send(result.insertedCount > 0)
-  })
-})
- 
-// get all admins
-app.get('/admins', (req, res) =>{
-  adminCollection.find({})
-  .toArray((err, documents) =>{
-    res.send(documents)
-  })
-})
-
-// adding service into database
-  app.post('/addService', (req, res) =>{
-    const file = req.files.file;
-      const title = req.body.title;
+  // add service post method
+  app.post('/addService', (req, res) => {
+      const file = req.files.file;
+      const taskName = req.body.taskName;
       const description = req.body.description;
-      const filePath = `${__dirname}/service/${file.name}`;
-      
-      file.mv(filePath, err =>{
-            if(err){
-              console.log(err);
-              return res.status(500).send({msg: 'fail to load image'})
-            }
-            const newImg = fs.readFileSync(filePath);
-            const encImg = newImg.toString('base64');
-        
-            var photo = {
-              contentType: req.files.file.mimetype,
-              size: req.files.size,
-              img: Buffer(encImg, 'base64')
-            }
-        
-            serviceCollection.insertOne({title, description, photo})
-              .then(result =>{ 
-                fs.remove(filePath, error =>{
-                  if(error){console.log(error)}
-                  res.send(result.insertedCount > 0)
-                })
-              })
+      const newImg = file.data;
+      const encImg = newImg.toString('base64');
+
+      const image = {
+          contentType: file.mimetype,
+          size: file.size,
+          img: Buffer.from(encImg, 'base64')
+      };
+      const src = image.img;
+
+      serviceCollection.insertOne({ taskName, description, src, image })
+          .then(result => {
+              res.send(result.insertedCount > 0);
           })
-})
+  })
 
+  // fetch all service from database (get method)
+  app.get('/services', (req, res) => {
+      serviceCollection.find({}).limit(6)
+          .toArray((err, documents) => {
+              res.send(documents);
+          })
+  })
 
-
-// get all services
- app.get('/services', (req, res) =>{
-   serviceCollection.find({})
-   .toArray((err, documents) =>{
-     res.send(documents)
-   })
- })
-
-
-
-// adding reviews into database
-
-app.post('/addReview', (req, res) =>{
-  const file = req.files.file;
-  const name = req.body.name;
-  const Designation = req.body.Designation
-  const description = req.body.description;
-  const filePath = `${__dirname}/review/${file.name}`;
-
-  file.mv(filePath, err =>{
-    if(err){
-      console.log(err);
-      return res.status(500).send({msg: 'fail to load image'})
-    }
-    const newImg = fs.readFileSync(filePath);
+  // feedback post method
+  app.post('/insertFeedback', (req, res) => {
+    const  name = req.body.name;
+    const description = req.body.description;
+    const position = req.body.position;
+    const file = req.files.file;
+    const newImg = file.data;
     const encImg = newImg.toString('base64');
-
-    var image = {
-      contentType: req.files.file.mimetype,
-      size: req.files.size,
-      img: Buffer(encImg, 'base64')
+    const image = {
+        contentType: file.mimetype,
+        size: file.size,
+        img: Buffer.from(encImg, 'base64')
     }
-
-    reviewCollection.insertOne({name, description, Designation, image})
-      .then(result =>{ 
-        fs.remove(filePath, error =>{
-          if(error){console.log(error)}
-          res.send(result.insertedCount > 0)
+    feedbackCollection.insertOne({name, description, image, position})
+        .then(result => {
+            res.send(result.insertedCount > 0)
         })
-      })
-  })
-})
-
-
-
-//get all reviews 
-app.get('/reviews', (req, res) =>{
-  reviewCollection.find({})
-  .toArray((err, documents) =>{
-    res.send(documents)
-  })
-})
-
-//adding order into database
-  app.post('/order', (req, res) =>{
-      const order = req.body
-      userCollection.insertOne(order)
-      .then(result =>{ 
-        res.send(result.insertedCount > 0)
-      })
   })
 
-  // get all orderList
- app.get('/allOrders', (req, res) =>{
-  userCollection.find({})
-  .toArray((err, documents) =>{
-    res.send(documents)
-  })
-})
-
-  // get all orderList by email
-  app.get('/orderList/:email', (req, res) =>{
-      userCollection.find({email: req.params.email})
-    .toArray((err, documents) =>{
-      res.send(documents)
-    })
-  })
-  
-  app.get('/', function (req, res) {
-    res.send('Hello World')
+  // feedback get method
+  app.get('/feedbacks', (req, res) => {
+      feedbackCollection.find({}).limit(6)
+          .toArray((err, documents) => {
+              res.send(documents);
+          })
   })
 
+  // store message in database
+  app.post('/privateMessage', (req, res) => {
+      message = req.body;
+      messageCollection.insertOne(message)
+          .then(result => {
+              res.send(result.insertedCount > 0)
+          })
+  })
+
+  // store customer order in database
+  app.post('/placeOrder', (req, res) => {
+      order = req.body;
+      customerOrdersCollection.insertOne(order)
+          .then(result => {
+              res.send(result.insertedCount > 0)
+          })
+  })
+
+  // fetch customer order from database
+  app.get('/customerOrders/:email', (req, res) => {
+      const email = req.params.email
+      adminCollection.find({ email: email })
+          .toArray((err, admin) => {
+              const filter = {}
+              if (admin.length === 0) {
+                  filter.email = email
+              }
+              customerOrdersCollection.find(filter)
+                  .toArray((err, documents) => {
+                      res.send(documents);
+                  })
+          })
+
+  })
+
+  // make new admin
+  app.post('/makeAdmin', (req, res) => {
+      newAdmin = req.body
+      adminCollection.insertOne(newAdmin)
+          .then(result => {
+              res.send(result.insertedCount > 0)
+          })
+  })
+
+  // specified admin or user 
+  app.get('/isAdmin', (req, res) => {
+      adminCollection.find({ email: req.query.email })
+          .toArray((err, documents) => {
+              res.send(documents.length > 0)
+          })
+  })
+
+  app.patch('/update/:id', (req, res) => {
+      customerOrdersCollection.updateOne({ _id: ObjectId(req.params.id) },
+          {
+              $set: { status: req.body.status }
+          })
+          .then(result => {
+              res.send(result.modifiedCount > 0)
+          })
+  })
+
+  console.log('database connected');
 });
 
-
-
-app.listen(process.env.PORT || 5000)
+app.listen(process.env.PORT || 5000, () => {
+  console.log(`App listening at 5000`)
+})
