@@ -90,7 +90,7 @@ client.connect(err => {
 
   // store customer order in database
   app.post('/placeOrder', (req, res) => {
-      order = req.body;
+      const order = req.body;
       customerOrdersCollection.insertOne(order)
           .then(result => {
               res.send(result.insertedCount > 0)
